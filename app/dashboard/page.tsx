@@ -1,7 +1,11 @@
+// Dashboard page component that displays user's projects
+// Allows users to manage their projects and access code reviews
+
 "use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import { GitPullRequest, Plus, Settings } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -9,34 +13,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { SiteHeader } from "@/components/site-header"
+import { AddProjectDialog } from "@/components/add-project-dialog"
 
+// Project type definition
 interface Project {
   id: string
   name: string
-  repo: string
+  description: string
+  repoUrl: string
   prs: number
   lastReview: string
 }
 
 export default function DashboardPage() {
+  const { data: session, status } = useSession()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [isAddProjectOpen, setIsAddProjectOpen] = useState(false)
 
   useEffect(() => {
-    // Simulate API call
+    // Simulate API call to fetch user's projects
+    // In a real app, this would be a fetch request to your API
     setTimeout(() => {
       setProjects([
         {
           id: "1",
-          name: "Project A",
-          repo: "user/repo-a",
+          name: "E-commerce Platform",
+          description: "Online shopping platform with React and Node.js",
+          repoUrl: "user/ecommerce-platform",
           prs: 3,
           lastReview: "2h ago",
         },
         {
           id: "2",
-          name: "Project B",
-          repo: "user/repo-b",
+          name: "Task Management App",
+          description: "Productivity app for managing tasks and projects",
+          repoUrl: "user/task-manager",
           prs: 1,
           lastReview: "1d ago",
         },
@@ -45,10 +58,43 @@ export default function DashboardPage() {
     }, 1000)
   }, [])
 
+  // Show loading state while session is being fetched
+  if (status === "loading") {
+    return <div>Loading...</div>
+  }
+
+  // If user is not authenticated, show access denied message
+  if (!session) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <SiteHeader />
+        <div className="container flex flex-1 items-center justify-center">
+          <Card>
+            <CardHeader>
+              <CardTitle>Access Denied</CardTitle>
+              <CardDescription>Please sign in to access the dashboard</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/login">Sign In</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center justify-between">
+      <SiteHeader />
+
+      <div className="container py-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Manage your projects and code reviews</p>
+          </div>
           <div className="flex items-center gap-4">
             <Input className="w-[200px]" placeholder="Search projects..." />
             <Select defaultValue="all">
@@ -61,22 +107,19 @@ export default function DashboardPage() {
                 <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex items-center gap-4">
             <Button variant="outline" size="icon" asChild>
               <Link href="/settings">
                 <Settings className="h-4 w-4" />
               </Link>
             </Button>
-            <Button>
+            <Button onClick={() => setIsAddProjectOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Add Project
             </Button>
           </div>
         </div>
-      </header>
 
-      <main className="flex-1 space-y-4 p-4 md:p-8">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Project cards grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {loading
             ? Array.from({ length: 3 }).map((_, i) => (
                 <Card key={i}>
@@ -93,7 +136,7 @@ export default function DashboardPage() {
                 <Card key={project.id}>
                   <CardHeader>
                     <CardTitle>{project.name}</CardTitle>
-                    <CardDescription>{project.repo}</CardDescription>
+                    <CardDescription>{project.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center justify-between">
@@ -109,7 +152,16 @@ export default function DashboardPage() {
                 </Card>
               ))}
         </div>
-      </main>
+      </div>
+
+      {/* Dialog for adding new projects */}
+      <AddProjectDialog
+        open={isAddProjectOpen}
+        onOpenChange={setIsAddProjectOpen}
+        onAddProject={(project) => {
+          setProjects([...projects, { ...project, id: Date.now().toString(), prs: 0, lastReview: "Just now" }])
+        }}
+      />
     </div>
   )
 }

@@ -1,38 +1,21 @@
-import { MongoDBAdapter } from "@auth/mongodb-adapter";
-import NextAuth from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import GithubProvider from "next-auth/providers/github";
-import GoogleProvider from "next-auth/providers/google";
+import { PrismaAdapter } from "@auth/prisma-adapter"
+import type { NextAuthOptions } from "next-auth"
+import NextAuth from "next-auth/next"
+import GithubProvider from "next-auth/providers/github"
+import GoogleProvider from "next-auth/providers/google"
 
-import clientPromise from "@/lib/db";
+import { prisma } from "@/lib/prisma"
 
-export const authOptions = {
-  adapter: MongoDBAdapter(clientPromise),
+export const authOptions: NextAuthOptions = {
+  // Use Prisma adapter to store auth data in the database
+  adapter: PrismaAdapter(prisma),
+
+  // Configure authentication providers
   providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "text" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        // Hardcoded test credentials
-        if (
-          credentials?.email === "test@example.com" &&
-          credentials?.password === "password123"
-        ) {
-          return {
-            id: "1",
-            name: "Test User",
-            email: "test@example.com",
-          };
-        }
-        return null;
-      },
-    }),
     GithubProvider({
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
+      // Request additional scopes for GitHub API access
       authorization: {
         params: {
           scope: "read:user user:email repo pull_request",
@@ -44,18 +27,35 @@ export const authOptions = {
       clientSecret: process.env.GOOGLE_SECRET!,
     }),
   ],
+
+  // Customize session data
   callbacks: {
-    async session({ session, user }: any) {
-      session.user.id = user.id;
-      session.user.plan = user.plan || "free";
-      return session;
+    async session({ session, user }) {
+      if (session.user) {
+        // Add user ID and plan to the session
+        session.user.id = user.id
+        session.user.plan = user.plan || "free"
+      }
+      return session
     },
   },
+
+  // Custom pages for authentication flows
   pages: {
     signIn: "/login",
+    signUp: "/signup",
+    error: "/auth/error",
   },
-};
 
-const handler = NextAuth(authOptions);
+  // Use JWT strategy for sessions
+  session: {
+    strategy: "jwt",
+  },
+}
 
-export { handler as GET, handler as POST };
+// Create the NextAuth handler
+const handler = NextAuth(authOptions)
+
+// Export the handler for GET and POST requests
+export { handler as GET, handler as POST }
+

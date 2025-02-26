@@ -1,0 +1,132 @@
+// This file defines the database schema for the CodeReviewAI application
+// It uses Prisma ORM with PostgreSQL as the database provider
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User account information from OAuth providers
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// User sessions for authentication
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// User model with profile information and subscription details
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  plan          String    @default("free") // free, premium, team
+  subscriptionId String?  // For Stripe subscription tracking
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  projects      Project[]
+  comments      Comment[]
+  socialShares  SocialShare[]
+}
+
+// Email verification tokens
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Project model for repositories being analyzed
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  repoUrl     String?  // GitHub repository URL
+  isPublic    Boolean  @default(false)
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews     Review[]
+  comments    Comment[]
+  socialShares SocialShare[]
+}
+
+// Code review model for storing analysis results
+model Review {
+  id          String   @id @default(cuid())
+  projectId   String
+  prNumber    Int?     // GitHub PR number
+  title       String
+  codeContent String   @db.Text // Original code being reviewed
+  reviewContent String? @db.Text // AI-generated review content
+  status      String   @default("pending") // pending, completed, failed
+  improvements Int?    // Number of suggested improvements
+  performance  Int?    // Performance improvement percentage
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// Comments on public projects
+model Comment {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  userId      String
+  projectId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// Social media shares for code improvements
+model SocialShare {
+  id          String   @id @default(cuid())
+  platform    String   // twitter, linkedin, etc.
+  content     String   @db.Text
+  imageUrl    String?
+  userId      String
+  projectId   String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
